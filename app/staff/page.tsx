@@ -19,15 +19,17 @@ function beep() {
   } catch {}
 }
 
-const NEXT_STATUS: Record<string, keyof typeof STATUS_META> = {
+const NEXT_STATUS: Record<string, 'preparing' | 'ready' | 'completed'> = {
   pending: 'preparing',
   preparing: 'ready',
+  ready: 'completed',
 }
 
 const STATUS_META = {
   pending:   { label: 'Pending',   color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
   preparing: { label: 'Preparing', color: 'bg-blue-400/20 text-blue-300 border-blue-400/30' },
   ready:     { label: 'Ready',     color: 'bg-green-400/20 text-green-300 border-green-400/30' },
+  completed: { label: 'Completed', color: 'bg-gray-400/20 text-gray-400 border-gray-400/30' },
 }
 
 export default function StaffPage() {
@@ -70,6 +72,10 @@ export default function StaffPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p}` },
       body: JSON.stringify({ status: next }),
     })
+    // Remove completed orders from local state immediately — Realtime UPDATE will also fire
+    if (next === 'completed') {
+      setOrders(prev => prev.filter(o => o.id !== order.id))
+    }
   }
 
   // Fetch + Realtime subscription
@@ -80,6 +86,7 @@ export default function StaffPage() {
     supabase
       .from('orders')
       .select('*')
+      .neq('status', 'completed')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) {
@@ -107,7 +114,11 @@ export default function StaffPage() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
         ({ new: o }) => {
-          setOrders(prev => prev.map(existing => existing.id === o.id ? o : existing))
+          if (o.status === 'completed') {
+            setOrders(prev => prev.filter(existing => existing.id !== o.id))
+          } else {
+            setOrders(prev => prev.map(existing => existing.id === o.id ? o : existing))
+          }
         }
       )
       .subscribe(status => {
@@ -213,9 +224,15 @@ export default function StaffPage() {
                       {NEXT_STATUS[order.status] && (
                         <button
                           onClick={() => advanceStatus(order)}
-                          className="w-full mt-1 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition"
+                          className={`w-full mt-1 py-2 text-white text-sm font-semibold rounded-lg transition ${
+                            NEXT_STATUS[order.status] === 'completed'
+                              ? 'bg-gray-600 hover:bg-gray-500'
+                              : 'bg-green-600 hover:bg-green-500'
+                          }`}
                         >
-                          Mark as {STATUS_META[NEXT_STATUS[order.status]].label} →
+                          {NEXT_STATUS[order.status] === 'completed'
+                            ? 'Done — Remove ✓'
+                            : `Mark as ${STATUS_META[NEXT_STATUS[order.status]].label} →`}
                         </button>
                       )}
                     </div>

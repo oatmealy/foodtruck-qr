@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
 
-const VALID_STATUSES = ['pending', 'preparing', 'ready']
+const VALID_STATUSES = ['pending', 'preparing', 'ready', 'completed']
 
 function isAuthorized(req: NextRequest) {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '')

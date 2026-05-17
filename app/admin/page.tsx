@@ -113,6 +113,12 @@ export default function AdminPage() {
       <header className="bg-gray-900 text-white px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-bold">Menu Management</h1>
         <div className="flex items-center gap-4">
+          <a
+            href="/admin/orders"
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition"
+          >
+            Order history
+          </a>
           <button
             onClick={() => setShowForm(s => !s)}
             className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition"

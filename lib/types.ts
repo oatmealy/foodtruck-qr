@@ -20,7 +20,7 @@ export type Order = {
   id: string
   order_number: number
   items: OrderItem[]
-  status: 'pending' | 'preparing' | 'ready'
+  status: 'pending' | 'preparing' | 'ready' | 'completed'
   total: number
   created_at: string
 }
