@@ -1,3 +1,10 @@
+export type Addon = {
+  id: string
+  name_en: string
+  name_ar: string
+  price: number
+}
+
 export type MenuItem = {
   id: string
   name_en: string
@@ -5,6 +12,7 @@ export type MenuItem = {
   price: number
   image_url: string | null
   available: boolean
+  addons: Addon[]
   created_at: string
 }
 
@@ -14,6 +22,7 @@ export type OrderItem = {
   name_ar: string
   price: number
   qty: number
+  addons: Addon[]
 }
 
 export type Order = {

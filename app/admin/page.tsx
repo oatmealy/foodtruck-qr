@@ -1,7 +1,68 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { MenuItem } from '@/lib/types'
+import type { MenuItem, Addon } from '@/lib/types'
+
+type AddonDraft = { id: string; name_en: string; name_ar: string; price: string }
+
+function newId() {
+  return Math.random().toString(36).slice(2, 10)
+}
+
+function AddonEditor({
+  addons,
+  onChange,
+}: {
+  addons: AddonDraft[]
+  onChange: (addons: AddonDraft[]) => void
+}) {
+  return (
+    <div className="space-y-2">
+      {addons.map((a, i) => (
+        <div key={a.id} className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={a.name_en}
+            onChange={e => onChange(addons.map((x, j) => j === i ? { ...x, name_en: e.target.value } : x))}
+            placeholder="Name (EN)"
+            className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          />
+          <input
+            type="text"
+            dir="rtl"
+            value={a.name_ar}
+            onChange={e => onChange(addons.map((x, j) => j === i ? { ...x, name_ar: e.target.value } : x))}
+            placeholder="الاسم"
+            className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-right"
+          />
+          <input
+            type="number"
+            step="0.001"
+            min="0"
+            value={a.price}
+            onChange={e => onChange(addons.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
+            placeholder="+BD"
+            className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          />
+          <button
+            type="button"
+            onClick={() => onChange(addons.filter((_, j) => j !== i))}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-400 hover:bg-red-100 text-sm font-bold shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...addons, { id: newId(), name_en: '', name_ar: '', price: '' }])}
+        className="text-xs text-gray-500 hover:text-gray-900 border border-dashed border-gray-300 rounded-lg px-3 py-1.5 w-full transition"
+      >
+        + Add add-on option
+      </button>
+    </div>
+  )
+}
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false)
@@ -14,6 +75,11 @@ export default function AdminPage() {
   const [form, setForm] = useState({
     name_en: '', name_ar: '', price: '', image_url: '', available: true,
   })
+  const [formAddons, setFormAddons] = useState<AddonDraft[]>([])
+
+  const [addonEditorId, setAddonEditorId] = useState<string | null>(null)
+  const [addonDraft, setAddonDraft] = useState<AddonDraft[]>([])
+  const [savingAddons, setSavingAddons] = useState(false)
 
   useEffect(() => {
     const p = sessionStorage.getItem('staff_pass')
@@ -73,15 +139,50 @@ export default function AdminPage() {
         price: parseFloat(form.price),
         image_url: form.image_url || null,
         available: form.available,
+        addons: formAddons.map(a => ({
+          id: a.id,
+          name_en: a.name_en,
+          name_ar: a.name_ar,
+          price: parseFloat(a.price) || 0,
+        })),
       }),
     })
     const data = await res.json()
     if (data.item) {
       setItems(prev => [data.item, ...prev])
       setForm({ name_en: '', name_ar: '', price: '', image_url: '', available: true })
+      setFormAddons([])
       setShowForm(false)
     }
     setAdding(false)
+  }
+
+  const openAddonEditor = (item: MenuItem) => {
+    if (addonEditorId === item.id) {
+      setAddonEditorId(null)
+      return
+    }
+    setAddonEditorId(item.id)
+    setAddonDraft(item.addons.map(a => ({ ...a, price: String(a.price) })))
+  }
+
+  const saveAddons = async (itemId: string) => {
+    setSavingAddons(true)
+    const p = sessionStorage.getItem('staff_pass') || password
+    const addons: Addon[] = addonDraft.map(a => ({
+      id: a.id,
+      name_en: a.name_en,
+      name_ar: a.name_ar,
+      price: parseFloat(a.price) || 0,
+    }))
+    await fetch(`/api/menu/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p}` },
+      body: JSON.stringify({ addons }),
+    })
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, addons } : i))
+    setAddonEditorId(null)
+    setSavingAddons(false)
   }
 
   // ── Password gate ─────────────────────────────────────────────────────────
@@ -126,7 +227,7 @@ export default function AdminPage() {
             Order history
           </a>
           <button
-            onClick={() => setShowForm(s => !s)}
+            onClick={() => { setShowForm(s => !s); setFormAddons([]) }}
             className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition"
           >
             {showForm ? 'Cancel' : '+ Add item'}
@@ -204,6 +305,12 @@ export default function AdminPage() {
               />
               Available on menu
             </label>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2">Add-ons (optional)</label>
+              <AddonEditor addons={formAddons} onChange={setFormAddons} />
+            </div>
+
             <button
               type="submit"
               disabled={adding}
@@ -222,30 +329,64 @@ export default function AdminPage() {
         ) : (
           <div className="space-y-2">
             {items.map(item => (
-              <div
-                key={item.id}
-                className={`bg-white rounded-xl p-4 shadow-sm flex items-center gap-4 transition ${!item.available ? 'opacity-50' : ''}`}
-              >
-                {item.image_url ? (
-                  <img src={item.image_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-amber-50 flex items-center justify-center text-2xl shrink-0">🥘</div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">{item.name_en}</p>
-                  <p className="text-gray-400 text-xs" dir="rtl">{item.name_ar}</p>
-                  <p className="text-green-700 font-bold text-sm">{Number(item.price).toFixed(3)} BD</p>
+              <div key={item.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className={`p-4 flex items-center gap-4 transition ${!item.available ? 'opacity-50' : ''}`}>
+                  {item.image_url ? (
+                    <img src={item.image_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-amber-50 flex items-center justify-center text-2xl shrink-0">🥘</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">{item.name_en}</p>
+                    <p className="text-gray-400 text-xs" dir="rtl">{item.name_ar}</p>
+                    <p className="text-green-700 font-bold text-sm">{Number(item.price).toFixed(3)} BD</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => openAddonEditor(item)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                        addonEditorId === item.id
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Add-ons {item.addons.length > 0 ? `(${item.addons.length})` : ''}
+                    </button>
+                    <button
+                      onClick={() => toggleAvailable(item)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                        item.available
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {item.available ? 'Available' : 'Hidden'}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => toggleAvailable(item)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition shrink-0 ${
-                    item.available
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                >
-                  {item.available ? 'Available' : 'Hidden'}
-                </button>
+
+                {/* Inline addon editor */}
+                {addonEditorId === item.id && (
+                  <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50 space-y-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add-on options for {item.name_en}</p>
+                    <AddonEditor addons={addonDraft} onChange={setAddonDraft} />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveAddons(item.id)}
+                        disabled={savingAddons}
+                        className="flex-1 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-gray-800 transition"
+                      >
+                        {savingAddons ? 'Saving…' : 'Save add-ons'}
+                      </button>
+                      <button
+                        onClick={() => setAddonEditorId(null)}
+                        className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

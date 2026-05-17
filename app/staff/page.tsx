@@ -227,8 +227,13 @@ export default function StaffPage() {
                         </span>
                       </div>
                       <ul className="text-sm text-gray-300 space-y-0.5">
-                        {(order.items as Array<{ qty: number; name_en: string }>).map((it, i) => (
-                          <li key={i}>{it.qty}× {it.name_en}</li>
+                        {(order.items as Array<{ qty: number; name_en: string; addons?: Array<{ name_en: string }> }>).map((it, i) => (
+                          <li key={i}>
+                            {it.qty}× {it.name_en}
+                            {it.addons && it.addons.length > 0 && (
+                              <span className="text-gray-400 text-xs"> ({it.addons.map(a => a.name_en).join(', ')})</span>
+                            )}
+                          </li>
                         ))}
                       </ul>
                       {NEXT_STATUS[order.status] && (
