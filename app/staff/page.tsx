@@ -1,0 +1,215 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+import type { Order } from '@/lib/types'
+
+function beep() {
+  try {
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = 880
+    gain.gain.setValueAtTime(0.4, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.5)
+  } catch {}
+}
+
+const NEXT_STATUS: Record<string, keyof typeof STATUS_META> = {
+  pending: 'preparing',
+  preparing: 'ready',
+}
+
+const STATUS_META = {
+  pending:   { label: 'Pending',   color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
+  preparing: { label: 'Preparing', color: 'bg-blue-400/20 text-blue-300 border-blue-400/30' },
+  ready:     { label: 'Ready',     color: 'bg-green-400/20 text-green-300 border-green-400/30' },
+}
+
+export default function StaffPage() {
+  const [authed, setAuthed] = useState(false)
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(false)
+  const seen = useRef(new Set<string>())
+
+  // Restore session
+  useEffect(() => {
+    const p = sessionStorage.getItem('staff_pass')
+    if (p) { setPassword(p); setAuthed(true) }
+  }, [])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const res = await fetch('/api/auth/staff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    })
+    if (res.ok) {
+      sessionStorage.setItem('staff_pass', password)
+      setAuthed(true)
+      setAuthError('')
+    } else {
+      setAuthError('Incorrect password')
+    }
+  }
+
+  const advanceStatus = async (order: Order) => {
+    const next = NEXT_STATUS[order.status]
+    if (!next) return
+    const p = sessionStorage.getItem('staff_pass') || password
+    await fetch(`/api/orders/${order.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p}` },
+      body: JSON.stringify({ status: next }),
+    })
+  }
+
+  // Fetch + Realtime subscription
+  useEffect(() => {
+    if (!authed) return
+    setLoading(true)
+
+    supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) {
+          setOrders(data as Order[])
+          data.forEach(o => seen.current.add(o.id))
+        }
+        setLoading(false)
+      })
+
+    const channel = supabase
+      .channel('orders-staff')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        payload => {
+          if (payload.eventType === 'INSERT') {
+            const o = payload.new as Order
+            if (!seen.current.has(o.id)) {
+              seen.current.add(o.id)
+              beep()
+              setOrders(prev => [o, ...prev])
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            setOrders(prev =>
+              prev.map(o => o.id === payload.new.id ? payload.new as Order : o)
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [authed])
+
+  // ── Password gate ─────────────────────────────────────────────────────────
+  if (!authed) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
+        <form onSubmit={handleLogin} className="bg-white rounded-2xl p-8 w-full max-w-sm space-y-4">
+          <h1 className="text-xl font-bold text-gray-900">Kitchen Login</h1>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Staff password"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            autoFocus
+          />
+          {authError && <p className="text-red-500 text-sm">{authError}</p>}
+          <button
+            type="submit"
+            className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition"
+          >
+            Login
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  const grouped = {
+    pending:   orders.filter(o => o.status === 'pending'),
+    preparing: orders.filter(o => o.status === 'preparing'),
+    ready:     orders.filter(o => o.status === 'ready'),
+  }
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+        <h1 className="text-lg font-bold">Kitchen Dashboard</h1>
+        <button
+          onClick={() => { sessionStorage.removeItem('staff_pass'); setAuthed(false) }}
+          className="text-sm text-gray-400 hover:text-white transition"
+        >
+          Logout
+        </button>
+      </header>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64 text-gray-400">Loading orders…</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
+          {(['pending', 'preparing', 'ready'] as const).map(status => {
+            const meta = STATUS_META[status]
+            const col = grouped[status]
+            return (
+              <div key={status} className="bg-gray-800 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-lg">{meta.label}</h2>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${meta.color}`}>
+                    {col.length}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {col.length === 0 && (
+                    <p className="text-gray-500 text-sm text-center py-8">No orders</p>
+                  )}
+                  {col.map(order => (
+                    <div key={order.id} className="bg-gray-700 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl font-black text-green-400">
+                          #{order.order_number}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(order.created_at).toLocaleTimeString([], {
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <ul className="text-sm text-gray-300 space-y-0.5">
+                        {(order.items as Array<{ qty: number; name_en: string }>).map((it, i) => (
+                          <li key={i}>{it.qty}× {it.name_en}</li>
+                        ))}
+                      </ul>
+                      {NEXT_STATUS[order.status] && (
+                        <button
+                          onClick={() => advanceStatus(order)}
+                          className="w-full mt-1 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition"
+                        >
+                          Mark as {STATUS_META[NEXT_STATUS[order.status]].label} →
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
