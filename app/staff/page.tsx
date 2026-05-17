@@ -87,7 +87,7 @@ export default function StaffPage() {
       .from('orders')
       .select('*')
       .neq('status', 'completed')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (data) {
           setOrders(data as Order[])
@@ -106,7 +106,7 @@ export default function StaffPage() {
           if (!seen.current.has(o.id)) {
             seen.current.add(o.id)
             beep()
-            setOrders(prev => [o, ...prev])
+            setOrders(prev => [...prev, o])
           }
         }
       )
