@@ -114,6 +114,12 @@ export default function AdminPage() {
         <h1 className="text-lg font-bold">Menu Management</h1>
         <div className="flex items-center gap-4">
           <a
+            href="/admin/stats"
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition"
+          >
+            Daily sales
+          </a>
+          <a
             href="/admin/orders"
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition"
           >

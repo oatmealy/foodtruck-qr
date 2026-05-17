@@ -245,14 +245,12 @@ export default function StaffPage() {
                             : `Mark as ${STATUS_META[NEXT_STATUS[order.status]].label} →`}
                         </button>
                       )}
-                      {order.status === 'pending' && (
-                        <button
-                          onClick={() => cancelOrder(order)}
-                          className="w-full py-2 bg-transparent border border-red-500/50 text-red-400 hover:bg-red-500/10 text-sm font-semibold rounded-lg transition"
-                        >
-                          Cancel
-                        </button>
-                      )}
+                      <button
+                        onClick={() => cancelOrder(order)}
+                        className="w-full py-2 bg-transparent border border-red-500/50 text-red-400 hover:bg-red-500/10 text-sm font-semibold rounded-lg transition"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   ))}
                 </div>
