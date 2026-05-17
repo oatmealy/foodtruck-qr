@@ -78,6 +78,16 @@ export default function StaffPage() {
     }
   }
 
+  const cancelOrder = async (order: Order) => {
+    const p = sessionStorage.getItem('staff_pass') || password
+    setOrders(prev => prev.filter(o => o.id !== order.id))
+    await fetch(`/api/orders/${order.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p}` },
+      body: JSON.stringify({ status: 'cancelled' }),
+    })
+  }
+
   // Fetch + Realtime subscription
   useEffect(() => {
     if (!authed) return
@@ -86,7 +96,7 @@ export default function StaffPage() {
     supabase
       .from('orders')
       .select('*')
-      .neq('status', 'completed')
+      .not('status', 'in', '("completed","cancelled")')
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (data) {
@@ -114,7 +124,7 @@ export default function StaffPage() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
         ({ new: o }) => {
-          if (o.status === 'completed') {
+          if (o.status === 'completed' || o.status === 'cancelled') {
             setOrders(prev => prev.filter(existing => existing.id !== o.id))
           } else {
             setOrders(prev => prev.map(existing => existing.id === o.id ? o : existing))
@@ -233,6 +243,14 @@ export default function StaffPage() {
                           {NEXT_STATUS[order.status] === 'completed'
                             ? 'Done — Remove ✓'
                             : `Mark as ${STATUS_META[NEXT_STATUS[order.status]].label} →`}
+                        </button>
+                      )}
+                      {order.status === 'pending' && (
+                        <button
+                          onClick={() => cancelOrder(order)}
+                          className="w-full py-2 bg-transparent border border-red-500/50 text-red-400 hover:bg-red-500/10 text-sm font-semibold rounded-lg transition"
+                        >
+                          Cancel
                         </button>
                       )}
                     </div>
