@@ -37,6 +37,7 @@ export default function StaffPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
   const seen = useRef(new Set<string>())
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Restore session
   useEffect(() => {
@@ -88,29 +89,44 @@ export default function StaffPage() {
         setLoading(false)
       })
 
+    // Use a unique channel name so stale channels from HMR/remounts don't conflict
     const channel = supabase
-      .channel('orders-staff')
-      .on(
+      .channel(`orders-staff-${Date.now()}`)
+      .on<Order>(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        payload => {
-          if (payload.eventType === 'INSERT') {
-            const o = payload.new as Order
-            if (!seen.current.has(o.id)) {
-              seen.current.add(o.id)
-              beep()
-              setOrders(prev => [o, ...prev])
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            setOrders(prev =>
-              prev.map(o => o.id === payload.new.id ? payload.new as Order : o)
-            )
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        ({ new: o }) => {
+          if (!seen.current.has(o.id)) {
+            seen.current.add(o.id)
+            beep()
+            setOrders(prev => [o, ...prev])
           }
         }
       )
-      .subscribe()
+      .on<Order>(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        ({ new: o }) => {
+          setOrders(prev => prev.map(existing => existing.id === o.id ? o : existing))
+        }
+      )
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR') {
+          // Realtime connection failed — fall back to polling every 5 s
+          pollRef.current = setInterval(async () => {
+            const { data } = await supabase
+              .from('orders')
+              .select('*')
+              .order('created_at', { ascending: false })
+            if (data) setOrders(data as Order[])
+          }, 5000)
+        }
+      })
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      supabase.removeChannel(channel)
+    }
   }, [authed])
 
   // ── Password gate ─────────────────────────────────────────────────────────
