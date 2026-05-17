@@ -10,6 +10,7 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
   const [cart, setCart] = useState<CartItem[]>([])
   const [cartOpen, setCartOpen] = useState(false)
   const [orderNum, setOrderNum] = useState<number | null>(null)
+  const [orderTotal, setOrderTotal] = useState(0)
   const [placing, setPlacing] = useState(false)
   const [error, setError] = useState('')
 
@@ -73,6 +74,7 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to place order')
       setOrderNum(data.order_number)
+      setOrderTotal(totalPrice)
       setCart([])
       setCartOpen(false)
     } catch (e: unknown) {
@@ -93,6 +95,10 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
         <p className="font-black leading-none my-4" style={{ fontSize: 'clamp(80px,30vw,160px)' }}>
           {orderNum}
         </p>
+        <div className="bg-white/20 rounded-2xl px-8 py-4 mb-4">
+          <p className="text-sm opacity-80 mb-1">{ar ? 'المبلغ المستحق' : 'Amount due'}</p>
+          <p className="text-4xl font-black">{orderTotal.toFixed(3)} BD</p>
+        </div>
         <p className="opacity-70 text-lg max-w-xs">
           {ar ? 'سيُنادى على رقمك عندما يكون جاهزاً' : "We'll call your number when ready"}
         </p>
