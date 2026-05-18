@@ -80,6 +80,7 @@ export default function AdminPage() {
   const [addonEditorId, setAddonEditorId] = useState<string | null>(null)
   const [addonDraft, setAddonDraft] = useState<AddonDraft[]>([])
   const [savingAddons, setSavingAddons] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     const p = sessionStorage.getItem('staff_pass')
@@ -155,6 +156,16 @@ export default function AdminPage() {
       setShowForm(false)
     }
     setAdding(false)
+  }
+
+  const deleteItem = async (id: string) => {
+    const p = sessionStorage.getItem('staff_pass') || password
+    await fetch(`/api/menu/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${p}` },
+    })
+    setItems(prev => prev.filter(i => i.id !== id))
+    setConfirmDeleteId(null)
   }
 
   const openAddonEditor = (item: MenuItem) => {
@@ -362,8 +373,37 @@ export default function AdminPage() {
                     >
                       {item.available ? 'Available' : 'Hidden'}
                     </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(confirmDeleteId === item.id ? null : item.id)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-500 hover:bg-red-100 transition"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
+
+                {/* Delete confirmation */}
+                {confirmDeleteId === item.id && (
+                  <div className="border-t border-red-100 px-4 py-3 bg-red-50 flex items-center justify-between gap-4">
+                    <p className="text-sm text-red-700 font-medium">
+                      Permanently delete <span className="font-bold">{item.name_en}</span>?
+                    </p>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        className="px-4 py-1.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition"
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-4 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Inline addon editor */}
                 {addonEditorId === item.id && (
