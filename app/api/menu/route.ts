@@ -24,14 +24,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    const { name_en, name_ar, price, image_url, available } = await req.json()
+    const { name_en, name_ar, price, image_url, available, addons } = await req.json()
     if (!name_en || !name_ar || price == null) {
       return NextResponse.json({ error: 'name_en, name_ar, and price are required' }, { status: 400 })
     }
     const sb = getServiceClient()
     const { data, error } = await sb
       .from('menu_items')
-      .insert({ name_en, name_ar, price, image_url: image_url || null, available: available ?? true })
+      .insert({ name_en, name_ar, price, image_url: image_url || null, available: available ?? true, addons: addons ?? [] })
       .select()
       .single()
     if (error) throw error
