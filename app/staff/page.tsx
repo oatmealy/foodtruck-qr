@@ -236,6 +236,9 @@ export default function StaffPage() {
                           </li>
                         ))}
                       </ul>
+                      <p className="text-sm font-bold text-green-400 pt-1 border-t border-white/10">
+                        {Number(order.total).toFixed(3)} BD
+                      </p>
                       {NEXT_STATUS[order.status] && (
                         <button
                           onClick={() => advanceStatus(order)}
