@@ -3,7 +3,7 @@ import { getServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
-    const { items, total } = await req.json()
+    const { items, total, notes } = await req.json()
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Invalid items' }, { status: 400 })
     }
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await sb
       .from('orders')
-      .insert({ order_number: orderNum, items, total })
+      .insert({ order_number: orderNum, items, total, notes: notes?.trim() || null })
       .select('order_number')
       .single()
 

@@ -236,6 +236,11 @@ export default function StaffPage() {
                           </li>
                         ))}
                       </ul>
+                      {order.notes && (
+                        <p className="text-xs text-amber-300 bg-amber-400/10 rounded-lg px-2 py-1.5 border border-amber-400/20">
+                          📝 {order.notes}
+                        </p>
+                      )}
                       <p className="text-sm font-bold text-green-400 pt-1 border-t border-white/10">
                         {Number(order.total).toFixed(3)} BD
                       </p>

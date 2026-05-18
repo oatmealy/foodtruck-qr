@@ -31,5 +31,6 @@ export type Order = {
   items: OrderItem[]
   status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
   total: number
+  notes: string | null
   created_at: string
 }

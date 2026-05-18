@@ -27,6 +27,8 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
   const [placing, setPlacing] = useState(false)
   const [error, setError] = useState('')
 
+  const [notes, setNotes] = useState('')
+
   // Addon modal state
   const [addonModal, setAddonModal] = useState<MenuItem | null>(null)
   const [modalSelected, setModalSelected] = useState<Set<string>>(new Set())
@@ -115,6 +117,7 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
             addons: c.addons,
           })),
           total: totalPrice,
+          notes: notes.trim() || null,
         }),
       })
       const data = await res.json()
@@ -122,6 +125,7 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
       setOrderNum(data.order_number)
       setOrderTotal(totalPrice)
       setCart([])
+      setNotes('')
       setCartOpen(false)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
@@ -366,7 +370,18 @@ export default function MenuClient({ initialItems }: { initialItems: MenuItem[] 
               ))}
             </div>
 
-            <div className="px-5 pb-8 pt-4 border-t">
+            <div className="px-5 pt-3 pb-2 border-t">
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder={ar ? 'أي طلبات خاصة؟ (اختياري)' : 'Any special requests? (optional)'}
+                rows={2}
+                dir={ar ? 'rtl' : 'ltr'}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+              />
+            </div>
+
+            <div className="px-5 pb-8 pt-3">
               {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
               <div className="flex justify-between mb-4">
                 <span className="font-bold text-lg">{ar ? 'المجموع' : 'Total'}</span>
